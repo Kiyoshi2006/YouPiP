@@ -49,13 +49,27 @@ jobs:
         run: |
           mkdir -p out
           for d in YTVideoOverlay YouPiP; do
-            find "$d/.theos/obj" -name "$d.dylib" -exec cp -v {} out/ \;
+            # Lấy bản đã lipo + ký trong thư mục staging của Theos
+            f=$(find "$d/.theos/_" -name "$d.dylib" | head -n 1)
+            echo "== $d: $f"
+            cp -v "$f" "out/$d.dylib"
             cp -v "$d"/packages/*.deb out/ 2>/dev/null || true
             if [ -d "$d/layout/Library/Application Support/$d.bundle" ]; then
               cp -R "$d/layout/Library/Application Support/$d.bundle" out/
             fi
           done
           ls -la out
+
+      - name: Kiểm tra dylib (Mach-O + ldid)
+        run: |
+          for f in out/*.dylib; do
+            echo "=== $f"
+            file "$f"
+            lipo -info "$f"
+            otool -hv "$f" | tail -n 2
+            cp "$f" /tmp/check.dylib
+            ldid -S /tmp/check.dylib && echo "ldid -S OK"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
