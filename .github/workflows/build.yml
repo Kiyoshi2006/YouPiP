@@ -1,0 +1,63 @@
+name: Build YouPiP + YTVideoOverlay dylib
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      # YouPiP checkout vào thư mục "YouPiP" để YTVideoOverlay nằm CẠNH nó
+      # (Tweak.x import "../YTVideoOverlay/Header.h")
+      - name: Checkout YouPiP
+        uses: actions/checkout@v4
+        with:
+          path: YouPiP
+
+      - name: Clone YTVideoOverlay (fork của bạn, không có thì lấy bản gốc)
+        run: |
+          git clone --depth 1 "https://github.com/${{ github.repository_owner }}/YTVideoOverlay.git" YTVideoOverlay \
+          || git clone --depth 1 https://github.com/PoomSmart/YTVideoOverlay.git YTVideoOverlay
+          ls -1
+
+      - name: Cài công cụ
+        run: |
+          brew install ldid dpkg make
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Cài Theos
+        run: |
+          git clone --recursive --depth 1 https://github.com/theos/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Cài header YouTubeHeader và PSHeader vào Theos
+        run: |
+          git clone --depth 1 https://github.com/PoomSmart/YouTubeHeader.git "$HOME/theos/include/YouTubeHeader"
+          git clone --depth 1 https://github.com/PoomSmart/PSHeader.git "$HOME/theos/include/PSHeader"
+
+      - name: Build YTVideoOverlay
+        working-directory: YTVideoOverlay
+        run: make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+
+      - name: Build YouPiP
+        working-directory: YouPiP
+        run: make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+
+      - name: Gom file ra
+        run: |
+          mkdir -p out
+          for d in YTVideoOverlay YouPiP; do
+            find "$d/.theos/obj" -name "$d.dylib" -exec cp -v {} out/ \;
+            cp -v "$d"/packages/*.deb out/ 2>/dev/null || true
+            if [ -d "$d/layout/Library/Application Support/$d.bundle" ]; then
+              cp -R "$d/layout/Library/Application Support/$d.bundle" out/
+            fi
+          done
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YouPiP-dylibs
+          path: out/
