@@ -1,0 +1,9 @@
+Package: com.kiyoshi.ytlitespacefix
+Name: YTLiteSpaceFix
+Depends: mobilesubstrate
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: Fix YTLite download "not enough space" by using Apple's important-usage free capacity
+Maintainer: Kiyoshi2006
+Author: Kiyoshi2006
+Section: Tweaks

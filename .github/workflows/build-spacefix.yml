@@ -1,0 +1,52 @@
+name: Build YTLiteSpaceFix dylib
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "YTLiteSpaceFix/**"
+      - ".github/workflows/build-spacefix.yml"
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cài công cụ
+        run: |
+          brew install ldid dpkg make
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Cài Theos
+        run: |
+          git clone --recursive --depth 1 https://github.com/theos/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Build
+        working-directory: YTLiteSpaceFix
+        run: make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+
+      - name: Gom file ra
+        run: |
+          mkdir -p out
+          f=$(find YTLiteSpaceFix/.theos/_ -name "*.dylib" | head -n 1)
+          echo "== dylib: $f"
+          cp -v "$f" out/YTLiteSpaceFix.dylib
+          ls -la out
+
+      - name: Kiểm tra dylib (Mach-O + ldid)
+        run: |
+          f=out/YTLiteSpaceFix.dylib
+          file "$f"
+          lipo -info "$f"
+          otool -hv "$f" | tail -n 2
+          cp "$f" /tmp/check.dylib
+          ldid -S /tmp/check.dylib && echo "ldid -S OK"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YTLiteSpaceFix-dylib
+          path: out/
